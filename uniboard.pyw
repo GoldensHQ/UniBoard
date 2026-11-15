@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Точка входа UniBoard (без консольного окна — для повседневного запуска)."""
+"""UniBoard entry point (no console window — for everyday launching)."""
 import os
 import sys
 

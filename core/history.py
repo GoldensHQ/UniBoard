@@ -1,4 +1,4 @@
-"""История буфера обмена, сниппеты и умный подбор подсказок."""
+"""Clipboard history, snippets and smart suggestion matching."""
 import json
 import re
 import threading
@@ -17,7 +17,7 @@ MAX_TEXT_LEN = 100_000
 
 
 def classify(text: str) -> str:
-    """Определить тип содержимого: link / email / color / json / text."""
+    """Determine the content type: link / email / color / json / text."""
     s = (text or "").strip()
     if not s:
         return "text"
@@ -55,7 +55,7 @@ class ClipboardItem:
         self.uses = uses or 0
         self.pinned = bool(pinned)
 
-    # --- содержимое ---------------------------------------------------------
+    # --- content -------------------------------------------------------------
 
     @property
     def content_key(self):
@@ -72,9 +72,9 @@ class ClipboardItem:
     def preview(self, n=70):
         if self.type == "files":
             names = [Path(p).name for p in (self.paths or [])]
-            return trunc("%d файл(ов): %s" % (len(names), ", ".join(names)), n)
+            return trunc("%d file(s): %s" % (len(names), ", ".join(names)), n)
         if self.type == "image":
-            return "Изображение (PNG)"
+            return "Image (PNG)"
         return trunc(self.text or "", n)
 
     def to_dict(self):
@@ -91,7 +91,7 @@ class ClipboardItem:
 
 
 class Candidate:
-    """Вариант подсказки: что печатать, как показать и на что сослаться."""
+    """A suggestion candidate: what to insert, how to display, and what to reference."""
 
     __slots__ = ("insert", "display", "icon", "ref", "score")
 
@@ -104,7 +104,7 @@ class Candidate:
 
 
 class History:
-    """Список элементов (новые в начале) с потокобезопасным доступом."""
+    """A list of items (newest first) with thread-safe access."""
 
     def __init__(self, path: Path = cfgmod.HISTORY_PATH, capacity: int = 500):
         self.path = Path(path)
@@ -138,10 +138,10 @@ class History:
             self._last_save = now
             self.save()
 
-    # --- операции ------------------------------------------------------------
+    # --- operations ------------------------------------------------------------
 
     def add(self, item: ClipboardItem):
-        """Добавить копию; дубликат не плодим — поднимаем наверх."""
+        """Add a copied item; no duplicates — move the existing one to the top."""
         with self._lock:
             key = item.content_key
             for i, old in enumerate(self.items):
@@ -188,7 +188,7 @@ class History:
         return False
 
     def search(self, query=""):
-        """Для окна истории: закреплённые сверху, далее по свежести."""
+        """For the history window: pinned on top, then by recency."""
         q = (query or "").lower()
         with self._lock:
             items = list(self.items)
@@ -204,7 +204,7 @@ class History:
         with self._lock:
             return self.items[0] if self.items else None
 
-    # --- умные подсказки ------------------------------------------------------
+    # --- smart suggestions ------------------------------------------------------
 
     @staticmethod
     def _score(it, now):
@@ -212,7 +212,7 @@ class History:
         return min(it.uses, 20) * 3 + (50 if it.pinned else 0) + recency
 
     def candidates_for(self, buffer_lower, cfg, snippets):
-        """Подобрать кандидатов для буфера набора: сниппеты + спец-типы + тексты."""
+        """Pick candidates for the typing buffer: snippets + special types + texts."""
         out, now, n = [], time.time(), len(buffer_lower)
 
         if cfg.get("suggest_snippets", True):
@@ -247,7 +247,7 @@ class History:
                     out.append(Candidate(t, trunc(t, 66), it.icon, it,
                                          self._score(it, now)))
 
-        # дубликаты по тексту вставки — оставляем лучший
+        # duplicates by insert text — keep the best one
         best = {}
         for c in out:
             if c.insert not in best or best[c.insert].score < c.score:
@@ -257,11 +257,11 @@ class History:
 
 
 class Snippets:
-    """Список сниппетов: триггер → текст. Файл snippets.json."""
+    """A list of snippets: trigger → text. File snippets.json."""
 
     DEFAULTS = [
-        {"trigger": ";прив", "text": "Привет! Как дела?"},
-        {"trigger": ";дд", "text": "С уважением,\nUniBoard"},
+        {"trigger": ";hi", "text": "Hi, how are you?"},
+        {"trigger": ";sig", "text": "Best regards,\nUniBoard"},
     ]
 
     def __init__(self, path: Path = cfgmod.SNIPPETS_PATH):

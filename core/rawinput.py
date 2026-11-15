@@ -1,14 +1,15 @@
 # -*- coding: utf-8 -*-
-"""Слушатель клавиатуры через Raw Input (WM_INPUT) — БЕЗ низкоуровневых хуков.
+"""Keyboard listener via Raw Input (WM_INPUT) — WITHOUT low-level hooks.
 
-Почему это безопасно для системы: Raw Input ДОСТАВЛЯЕТ события в наше скрытое
-окно асинхронно (постановкой в очередь сообщений). Системный поток ввода
-ничего не ждёт от нас — в отличие от WH_KEYBOARD_LL, где ввод всей системы
-синхронно ждёт колбэк. Если наш поток замедлится/зависнет, пострадает только
-наш обработчик, клавиатура и мышь продолжат работать как обычно.
+Why this is safe for the system: Raw Input DELIVERS events to our hidden
+window asynchronously (by posting to the message queue). The system input
+thread waits nothing from us — unlike WH_KEYBOARD_LL, where the whole
+system's input synchronously waits for the callback. If our thread slows
+down/hangs, only our handler suffers; the keyboard and mouse keep working
+as usual.
 
-События нельзя «поглотить» (это принципиальное отличие от хука), поэтому
-вставка подсказки делается горячей клавишей (Ctrl+Space по умолчанию).
+Events cannot be "swallowed" (a fundamental difference from a hook), so
+suggestion insertion is done via a hotkey (Ctrl+Space by default).
 """
 import ctypes
 from ctypes import wintypes
@@ -23,10 +24,10 @@ WM_INPUT = 0x00FF
 WM_QUIT = 0x0012
 RIM_TYPEKEYBOARD = 1
 RID_INPUT = 0x10000003
-RIDEV_INPUTSINK = 0x00000100  # именно 0x100! (0x1 — это RIDEV_REMOVE)
+RIDEV_INPUTSINK = 0x00000100  # exactly 0x100! (0x1 is RIDEV_REMOVE)
 RI_KEY_BREAK = 0x01
-# ВАЖНО: Raw Input не доставляется message-only окнам — нужно обычное
-# скрытое окно верхнего уровня (мы его никогда не показываем).
+# IMPORTANT: Raw Input is not delivered to message-only windows — a regular
+# hidden top-level window is needed (we never show it).
 WS_EX_TOOLWINDOW = 0x00000080
 WS_EX_NOACTIVATE = 0x08000000
 
@@ -78,10 +79,10 @@ user32.RegisterRawInputDevices.restype = wintypes.BOOL
 
 
 class RawInputListener(threading.Thread):
-    """Скрытое окно + RegisterRawInputDevices(keyboard, INPUTSINK).
+    """Hidden window + RegisterRawInputDevices(keyboard, INPUTSINK).
 
-    on_key(ev) вызывается в этом же потоке (лёгкая постановка в очередь).
-    Модификаторы и CapsLock отслеживаются инкрементально.
+    on_key(ev) is called on this same thread (a lightweight queueing).
+    Modifiers and CapsLock are tracked incrementally.
     """
 
     def __init__(self, on_key, on_error=None):
@@ -102,7 +103,7 @@ class RawInputListener(threading.Thread):
         if self._tid:
             user32.PostThreadMessageW(self._tid, WM_QUIT, 0, 0)
 
-    # --- окно и регистрация ------------------------------------------------------
+    # --- window and registration ------------------------------------------------------
 
     def run(self):
         self._tid = kernel32.GetCurrentThreadId()
@@ -113,9 +114,9 @@ class RawInputListener(threading.Thread):
         wc.hInstance = hinstance
         if not user32.RegisterClassW(ctypes.byref(wc)):
             err = ctypes.get_last_error()
-            if err != 1410:  # 1410 = CLASS_ALREADY_EXISTS — можно продолжать
+            if err != 1410:  # 1410 = CLASS_ALREADY_EXISTS — we can continue
                 if self._on_error:
-                    self._on_error(f"RegisterClassW: ошибка {err}")
+                    self._on_error(f"RegisterClassW: error {err}")
                 return
         self._hwnd = user32.CreateWindowExW(
             WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE, "UniBoardRawInput",
@@ -123,14 +124,14 @@ class RawInputListener(threading.Thread):
             None, None, hinstance, None)
         if not self._hwnd:
             if self._on_error:
-                self._on_error(f"CreateWindowExW: ошибка {ctypes.get_last_error()}")
+                self._on_error(f"CreateWindowExW: error {ctypes.get_last_error()}")
             return
-        rid = RAWINPUTDEVICE(1, 6, RIDEV_INPUTSINK, self._hwnd)  # клавиатура
+        rid = RAWINPUTDEVICE(1, 6, RIDEV_INPUTSINK, self._hwnd)  # keyboard
         if not user32.RegisterRawInputDevices(ctypes.byref(rid), 1,
                                               ctypes.sizeof(RAWINPUTDEVICE)):
             if self._on_error:
                 self._on_error(f"RegisterRawInputDevices: "
-                               f"ошибка {ctypes.get_last_error()}")
+                               f"error {ctypes.get_last_error()}")
             return
         msg = wintypes.MSG()
         while True:
@@ -142,7 +143,7 @@ class RawInputListener(threading.Thread):
         if self._hwnd:
             user32.DestroyWindow(self._hwnd)
 
-    # --- события ------------------------------------------------------------------
+    # --- events ------------------------------------------------------------------
 
     def _proc(self, hwnd, msg, wp, lp):
         try:

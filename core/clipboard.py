@@ -1,4 +1,4 @@
-"""Буфер обмена Windows: чтение/запись текста, файлов, изображений (pywin32 + Pillow)."""
+"""Windows clipboard: reading/writing text, files, images (pywin32 + Pillow)."""
 import io
 import struct
 import time
@@ -11,7 +11,7 @@ CF_UNICODETEXT, CF_DIB, CF_HDROP = win32con.CF_UNICODETEXT, win32con.CF_DIB, win
 
 
 def _open_retry(timeout=1.0):
-    """Открыть буфер обмена, дождавшись освобождения другими приложениями."""
+    """Open the clipboard, waiting until other applications release it."""
     deadline = time.time() + timeout
     while True:
         try:
@@ -24,7 +24,7 @@ def _open_retry(timeout=1.0):
 
 
 def read_all():
-    """Считать доступные форматы: {"text", "files", "image"(PIL Image|None)}."""
+    """Read the available formats: {"text", "files", "image"(PIL Image|None)}."""
     out = {"text": None, "files": None, "image": None}
     if not _open_retry():
         return out
@@ -76,7 +76,7 @@ def write_files(paths):
 
 
 def write_image(img):
-    """Записать PIL Image как CF_DIB (24-bit, без альфы)."""
+    """Write a PIL Image as CF_DIB (24-bit, no alpha)."""
     data = _image_to_dib(img)
     if data is None:
         return False
@@ -84,7 +84,7 @@ def write_image(img):
 
 
 def _dropfiles_blob(paths):
-    """CF_HDROP: структура DROPFILES + список путей (UTF-16, двойной ноль)."""
+    """CF_HDROP: DROPFILES structure + a list of paths (UTF-16, double null)."""
     wide = "".join(p + "\0" for p in paths)
     payload = (wide + "\0").encode("utf-16-le")
     header = struct.pack("<IiiII", 20, 0, 0, 0, 1)  # pFiles=20, pt(0,0), fNC=0, fWide=1
@@ -95,10 +95,10 @@ def _image_to_dib(img):
     try:
         img = img.convert("RGB")
         w, h = img.size
-        raw = img.tobytes()  # RGB, сверху вниз
+        raw = img.tobytes()  # RGB, top to bottom
         row = ((w * 3 + 3) // 4) * 4
         out = bytearray()
-        for y in range(h - 1, -1, -1):  # DIB хранится снизу вверх
+        for y in range(h - 1, -1, -1):  # a DIB is stored bottom-up
             r = raw[y * w * 3:(y + 1) * w * 3]
             bgr = bytearray(r)
             bgr[0::3], bgr[2::3] = r[2::3], r[0::3]
@@ -111,7 +111,7 @@ def _image_to_dib(img):
 
 
 def _dib_to_image(dib):
-    """Обернуть сырой DIB в BMP-контейнер и открыть через Pillow."""
+    """Wrap a raw DIB in a BMP container and open it via Pillow."""
     from PIL import Image
     bisize = struct.unpack("<I", dib[:4])[0]
     bitcount = struct.unpack("<H", dib[14:16])[0]
@@ -126,7 +126,7 @@ def _dib_to_image(dib):
 
 
 def backup():
-    """Сохранить текущее содержимое буфера (текст, файлы, картинка)."""
+    """Save the current clipboard contents (text, files, image)."""
     d = read_all()
     b64 = None
     if d["image"] is not None:
@@ -140,7 +140,7 @@ def backup():
 
 
 def restore(data):
-    """Восстановить содержимое буфера (наилучшим образом из известных форматов)."""
+    """Restore the clipboard contents (as best as possible from the known formats)."""
     if not data:
         return False
     if not _open_retry():
@@ -167,6 +167,6 @@ def restore(data):
 
 
 def seq_number():
-    """Номер изменения буфера — быстрый способ заметить новое копирование."""
+    """Clipboard change number — a quick way to notice a new copy."""
     import ctypes
     return ctypes.windll.user32.GetClipboardSequenceNumber()

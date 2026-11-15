@@ -1,4 +1,4 @@
-"""Конфигурация UniBoard: пути, значения по умолчанию, горячие клавиши, автозапуск."""
+"""UniBoard configuration: paths, defaults, hotkeys, autostart."""
 import json
 import os
 import tempfile
@@ -8,7 +8,7 @@ APP_NAME = "UniBoard"
 
 
 def app_dir() -> Path:
-    """Каталог данных приложения: %APPDATA%\\UniBoard."""
+    """Application data directory: %APPDATA%\\UniBoard."""
     base = os.getenv("APPDATA") or str(Path.home())
     d = Path(base) / APP_NAME
     d.mkdir(parents=True, exist_ok=True)
@@ -22,31 +22,31 @@ IMAGES_DIR = app_dir() / "images"
 LOG_PATH = app_dir() / "uniboard.log"
 
 DEFAULTS = {
-    # Подсказки при печати
-    "suggest_enabled": True,       # общие подсказки (Tab)
-    "suggest_min_chars": 3,        # с какого числа символов показывать
-    "suggest_max_items": 6,        # максимум вариантов в окне подсказки
-    "suggest_snippets": True,      # предлагать сниппеты
-    "suggest_special": True,       # предлагать ссылки, e-mail, цвета, JSON
-    "suggest_plain_text": False,   # предлагать обычные тексты (от 24 символов)
-    "snippet_auto": False,         # авто-разворачивание сниппета при точном совпадении
-    "popup_timeout_ms": 10000,     # автоскрытие окна подсказки, мс
-    # Вставка
-    "insert_mode": "unicode",      # "unicode" — печатать посимвольно; "clipboard" — через буфер
-    "restore_clipboard": True,     # возвращать прежний буфер после вставки
-    # История
-    "hotkey_accept": "Ctrl+Space",     # вставить подсказку (Tab нельзя без хука)
-    "hotkey_history": "Ctrl+Alt+V",    # окно истории
-    "hotkey_paste_last": "Ctrl+Alt+X", # вставить последний элемент
-    "history_size": 500,               # сколько элементов хранить
-    "record_enabled": True,            # запись буфера обмена
-    "watch_interval_ms": 400,          # интервал опроса буфера, мс
-    # Прочее
-    "excluded_apps": ["keepass", "1password", "bitwarden", "enpass"],  # не показывать подсказки
-    "autostart": False,            # запуск вместе с Windows
+    # Suggestions while typing
+    "suggest_enabled": True,       # suggestions in general
+    "suggest_min_chars": 3,        # minimum typed characters before showing
+    "suggest_max_items": 6,        # maximum rows in the suggestion popup
+    "suggest_snippets": True,      # offer snippets
+    "suggest_special": True,       # offer links, e-mails, colors, JSON
+    "suggest_plain_text": False,   # offer plain texts (from 24 characters)
+    "snippet_auto": False,         # auto-expand a snippet on exact trigger match
+    "popup_timeout_ms": 10000,     # suggestion popup auto-hide, ms
+    # Insertion
+    "insert_mode": "unicode",      # "unicode" — type char by char; "clipboard" — via clipboard
+    "restore_clipboard": True,     # restore the previous clipboard after pasting
+    # History
+    "hotkey_accept": "Ctrl+Space",     # insert the suggestion (Tab is off-limits without hooks)
+    "hotkey_history": "Ctrl+Alt+V",    # history window
+    "hotkey_paste_last": "Ctrl+Alt+X", # paste the newest item
+    "history_size": 500,               # how many items to keep
+    "record_enabled": True,            # record the clipboard
+    "watch_interval_ms": 400,          # clipboard polling interval, ms
+    # Misc
+    "excluded_apps": ["keepass", "1password", "bitwarden", "enpass"],  # no suggestions here
+    "autostart": False,            # start together with Windows
 }
 
-# --- Горячие клавиши -------------------------------------------------------
+# --- Hotkeys ----------------------------------------------------------------
 
 _VK_NAMES = {
     "space": 0x20, "enter": 0x0D, "return": 0x0D, "tab": 0x09, "esc": 0x1B,
@@ -62,7 +62,7 @@ _MOD_ALIASES = {"ctrl": "ctrl", "control": "ctrl", "ctl": "ctrl",
 
 
 class Hotkey:
-    """Разобранная горячая клавиша: набор модификаторов + виртуальная клавиша."""
+    """A parsed hotkey: set of modifiers + virtual key."""
 
     __slots__ = ("name", "mods", "vk", "raw")
 
@@ -109,7 +109,7 @@ class Hotkey:
 
 
 def load_hotkeys(cfg):
-    """Собрать список активных горячих клавиш из конфига."""
+    """Build the list of active hotkeys from the config."""
     out = []
     hk = Hotkey.parse(cfg.get("hotkey_accept"), "accept")
     if hk:
@@ -123,7 +123,7 @@ def load_hotkeys(cfg):
     return out
 
 
-# --- Автозапуск через реестр ------------------------------------------------
+# --- Autostart via the registry ----------------------------------------------
 
 _RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
 
@@ -162,10 +162,10 @@ def autostart_enabled() -> bool:
         return False
 
 
-# --- Конфиг ----------------------------------------------------------------
+# --- Config -------------------------------------------------------------------
 
 class Config:
-    """Простой dict-конфиг с загрузкой/сохранением в JSON."""
+    """A simple dict-backed config with JSON load/save."""
 
     def __init__(self, path: Path = CONFIG_PATH):
         self.path = Path(path)
@@ -180,7 +180,7 @@ class Config:
                 if isinstance(stored, dict):
                     self.data.update(stored)
         except Exception:
-            pass  # повреждённый конфиг — используем значения по умолчанию
+            pass  # corrupted config — fall back to defaults
 
     def get(self, key, default=None):
         return self.data.get(key, DEFAULTS.get(key, default))

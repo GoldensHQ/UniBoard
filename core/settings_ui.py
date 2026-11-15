@@ -1,4 +1,4 @@
-"""Окно настроек UniBoard и редактор сниппетов (tkinter)."""
+"""UniBoard settings window and snippet editor (tkinter)."""
 import tkinter as tk
 from tkinter import ttk
 
@@ -36,7 +36,7 @@ class SettingsWindow:
             return
         w = tk.Toplevel(self.app.root)
         self.win = w
-        w.title("UniBoard — Настройки")
+        w.title("UniBoard — Settings")
         w.configure(bg=COLORS["bg"], padx=14, pady=12)
         w.geometry("560x640")
         w.transient(self.app.root)
@@ -56,7 +56,7 @@ class SettingsWindow:
         canvas.bind_all("<MouseWheel>", lambda e: canvas.yview_scroll(-1 * (e.delta // 120), "units"))
         canvas.configure(yscrollcommand=sb.set)
 
-        c = dict(self.app.cfg.data)  # черновик значений
+        c = dict(self.app.cfg.data)  # draft of values
 
         def header(text):
             tk.Label(body, text=text, bg=COLORS["bg"], fg=COLORS["accent"],
@@ -93,43 +93,43 @@ class SettingsWindow:
                        relief="flat", insertbackground=COLORS["fg"]).pack(side="left")
             return v
 
-        # --- Подсказки ---
-        header("Подсказки при печати")
-        v_suggest = check("suggest_enabled", "Показывать подсказки при печати")
-        v_snip = check("suggest_snippets", "Предлагать сниппеты")
-        v_spec = check("suggest_special", "Предлагать ссылки, e-mail, цвета, JSON")
-        v_plain = check("suggest_plain_text", "Предлагать длинные обычные тексты (от 24 символов)")
-        v_auto = check("snippet_auto", "Авто-разворачивать сниппеты при точном вводе триггера")
-        v_hk_acc = entry_row("Вставить подсказку (горячая клавиша)", "hotkey_accept")
-        v_min = spin_row("Минимум символов для подсказки", "suggest_min_chars", 1, 12)
-        v_max = spin_row("Максимум вариантов в окне", "suggest_max_items", 1, 10)
-        v_to = spin_row("Автоскрытие подсказки, мс", "popup_timeout_ms", 2000, 60000, 8)
+        # --- Suggestions ---
+        header("Suggestions while typing")
+        v_suggest = check("suggest_enabled", "Show suggestions while typing")
+        v_snip = check("suggest_snippets", "Suggest snippets")
+        v_spec = check("suggest_special", "Suggest links, e-mail, colors, JSON")
+        v_plain = check("suggest_plain_text", "Suggest long plain texts (24+ characters)")
+        v_auto = check("snippet_auto", "Auto-expand snippets when the trigger is typed exactly")
+        v_hk_acc = entry_row("Accept suggestion (hotkey)", "hotkey_accept")
+        v_min = spin_row("Minimum characters for a suggestion", "suggest_min_chars", 1, 12)
+        v_max = spin_row("Maximum items in the popup", "suggest_max_items", 1, 10)
+        v_to = spin_row("Auto-hide suggestion, ms", "popup_timeout_ms", 2000, 60000, 8)
 
-        # --- Вставка ---
-        header("Вставка")
+        # --- Paste ---
+        header("Paste")
         mode = tk.StringVar(value=str(c.get("insert_mode")))
         rowm = tk.Frame(body, bg=COLORS["bg"])
         rowm.pack(fill="x")
-        tk.Label(rowm, text="Способ вставки", bg=COLORS["bg"], fg=COLORS["muted"],
+        tk.Label(rowm, text="Paste method", bg=COLORS["bg"], fg=COLORS["muted"],
                  font=FONT_MAIN, width=30, anchor="w").pack(side="left")
         rb_f = tk.Frame(rowm, bg=COLORS["bg"])
         rb_f.pack(side="left")
-        for val, lbl in (("unicode", "Печать посимвольно"), ("clipboard", "Через буфер")):
+        for val, lbl in (("unicode", "Type character by character"), ("clipboard", "Via clipboard")):
             tk.Radiobutton(rb_f, text=lbl, value=val, variable=mode, bg=COLORS["bg"],
                            fg=COLORS["fg"], activebackground=COLORS["bg"],
                            selectcolor=COLORS["panel"], font=FONT_MAIN).pack(side="left", padx=(0, 10))
-        v_restore = check("restore_clipboard", "Возвращать прежний буфер после вставки")
+        v_restore = check("restore_clipboard", "Restore previous clipboard after pasting")
 
-        # --- Горячие клавиши ---
-        header("Горячие клавиши")
-        v_hk_hist = entry_row("Окно истории", "hotkey_history")
-        v_hk_last = entry_row("Вставить последний элемент", "hotkey_paste_last")
-        tk.Label(body, text="Формат: Ctrl+Alt+V — модификаторы Ctrl/Alt/Shift/Win + клавиша "
+        # --- Hotkeys ---
+        header("Hotkeys")
+        v_hk_hist = entry_row("History window", "hotkey_history")
+        v_hk_last = entry_row("Paste last item", "hotkey_paste_last")
+        tk.Label(body, text="Format: Ctrl+Alt+V — modifiers Ctrl/Alt/Shift/Win + a key "
                  "(A–Z, 0–9, F1–F24, Space, Enter…)", bg=COLORS["bg"], fg=COLORS["muted"],
                  font=FONT_SMALL, anchor="w", justify="left").pack(fill="x")
 
-        # --- Исключения ---
-        header("Не показывать подсказки в приложениях")
+        # --- Exclusions ---
+        header("Don't show suggestions in these apps")
         rowx = tk.Frame(body, bg=COLORS["bg"])
         rowx.pack(fill="x", pady=2)
         self.excl_list = _dark_listbox(rowx, height=4, font=FONT_SMALL)
@@ -144,14 +144,14 @@ class SettingsWindow:
         self._excl_entry.pack(pady=(0, 4), ipady=2)
         _btn(bx, "+", self._excl_add).pack(fill="x", pady=1)
         _btn(bx, "−", self._excl_del).pack(fill="x", pady=1)
-        tk.Label(body, text="Имя процесса (например chrome.exe). Пример по двойному клику по списку.",
+        tk.Label(body, text="Process name (e.g. chrome.exe). Double-click the list to add an example.",
                  bg=COLORS["bg"], fg=COLORS["muted"], font=FONT_SMALL, anchor="w").pack(fill="x")
 
-        # --- История и общее ---
-        header("История и общее")
-        v_rec = check("record_enabled", "Записывать буфер обмена в историю")
-        v_hist = spin_row("Хранить элементов", "history_size", 50, 5000, 8)
-        v_watch = spin_row("Интервал опроса буфера, мс", "watch_interval_ms", 150, 2000, 8)
+        # --- History and general ---
+        header("History and general")
+        v_rec = check("record_enabled", "Record clipboard into history")
+        v_hist = spin_row("Items to keep", "history_size", 50, 5000, 8)
+        v_watch = spin_row("Clipboard polling interval, ms", "watch_interval_ms", 150, 2000, 8)
         v_start = tk.BooleanVar(value=cfgmod.autostart_enabled())
 
         self._vars = dict(suggest_enabled=v_suggest, suggest_snippets=v_snip,
@@ -164,23 +164,23 @@ class SettingsWindow:
                           record_enabled=v_rec, history_size=v_hist,
                           watch_interval_ms=v_watch,
                           mode=mode, autostart=v_start)
-        tk.Checkbutton(body, text="Запускать UniBoard вместе с Windows", variable=v_start,
+        tk.Checkbutton(body, text="Start UniBoard with Windows", variable=v_start,
                        bg=COLORS["bg"], fg=COLORS["fg"], activebackground=COLORS["bg"],
                        activeforeground=COLORS["fg"], selectcolor=COLORS["panel"],
                        font=FONT_MAIN, anchor="w").pack(fill="x")
 
-        # --- сниппеты и кнопки ---
-        header("Сниппеты")
-        _btn(body, "✎  Редактор сниппетов…", lambda: SnippetEditor(self.app).open()).pack(anchor="w", pady=2)
+        # --- snippets and buttons ---
+        header("Snippets")
+        _btn(body, "✎  Snippet editor…", lambda: SnippetEditor(self.app).open()).pack(anchor="w", pady=2)
 
         btns = tk.Frame(w, bg=COLORS["bg"])
         btns.pack(side="bottom", fill="x", pady=(10, 0))
         self.status = tk.Label(btns, text="", bg=COLORS["bg"], fg=COLORS["danger"], font=FONT_SMALL)
         self.status.pack(side="left")
-        _btn(btns, "Сохранить", self.save).pack(side="right")
-        _btn(btns, "Отмена", self.close).pack(side="right", padx=6)
+        _btn(btns, "Save", self.save).pack(side="right")
+        _btn(btns, "Cancel", self.close).pack(side="right", padx=6)
 
-    # --- исключённые приложения ---------------------------------------------------
+    # --- excluded apps --------------------------------------------------------------
 
     def _excl_add(self):
         v = self._excl_entry.get().strip().lower()
@@ -197,7 +197,7 @@ class SettingsWindow:
             self._excl_values.pop(i)
             self.excl_list.delete(i)
 
-    # --- сохранение -----------------------------------------------------------------
+    # --- saving -----------------------------------------------------------------
 
     def save(self):
         v = self._vars
@@ -205,7 +205,7 @@ class SettingsWindow:
                              ("hotkey_history", v["hotkey_history"].get()),
                              ("hotkey_paste_last", v["hotkey_paste_last"].get())):
             if raw.strip() and Hotkey.parse(raw, err_key) is None:
-                self.status.configure(text=f"Не удалось разобрать горячую клавишу: {raw}")
+                self.status.configure(text=f"Failed to parse hotkey: {raw}")
                 return
         new = {
             "suggest_enabled": bool(v["suggest_enabled"].get()),
@@ -252,7 +252,7 @@ class SnippetEditor:
             return
         w = tk.Toplevel(self.app.root)
         self.win = w
-        w.title("UniBoard — Сниппеты")
+        w.title("UniBoard — Snippets")
         w.configure(bg=COLORS["bg"], padx=12, pady=10)
         w.geometry("560x420")
         w.transient(self.app.root)
@@ -266,24 +266,24 @@ class SnippetEditor:
         self.list.pack(side="left", fill="both", expand=True)
         side = tk.Frame(top, bg=COLORS["bg"])
         side.pack(side="left", padx=(8, 0))
-        _btn(side, "+ Добавить", self.add).pack(fill="x", pady=1)
-        _btn(side, "− Удалить", self.delete).pack(fill="x", pady=1)
+        _btn(side, "+ Add", self.add).pack(fill="x", pady=1)
+        _btn(side, "− Delete", self.delete).pack(fill="x", pady=1)
 
         fields = tk.Frame(w, bg=COLORS["bg"])
         fields.pack(fill="x", pady=(8, 0))
-        tk.Label(fields, text="Триггер (без пробелов, например ;прив)", bg=COLORS["bg"],
+        tk.Label(fields, text="Trigger (no spaces, e.g. ;hi)", bg=COLORS["bg"],
                  fg=COLORS["muted"], font=FONT_SMALL, anchor="w").pack(fill="x")
         self.trig = tk.Entry(fields, font=FONT_MAIN, bg=COLORS["panel"], fg=COLORS["fg"],
                              insertbackground=COLORS["fg"], relief="flat")
         self.trig.pack(fill="x", ipady=3)
-        tk.Label(fields, text="Текст разворачивается на месте триггера", bg=COLORS["bg"],
+        tk.Label(fields, text="Text is expanded in place of the trigger", bg=COLORS["bg"],
                  fg=COLORS["muted"], font=FONT_SMALL, anchor="w").pack(fill="x", pady=(6, 0))
         self.text = tk.Text(fields, font=FONT_MAIN, bg=COLORS["panel"], fg=COLORS["fg"],
                             insertbackground=COLORS["fg"], relief="flat", height=6,
                             wrap="word")
         self.text.pack(fill="both", expand=True, pady=(2, 6))
 
-        _btn(fields, "Сохранить выбранный", self.save_sel).pack(anchor="w")
+        _btn(fields, "Save selected", self.save_sel).pack(anchor="w")
         self.list.bind("<<ListboxSelect>>", self._load_sel)
         self.list.bind("<Double-Button-1>", self._load_sel)
         self.reload()
@@ -305,7 +305,7 @@ class SnippetEditor:
         self.text.insert("1.0", s["text"])
 
     def add(self):
-        trig = ";новый"
+        trig = ";new"
         self.app.snippets.items.append({"trigger": trig, "text": ""})
         self.app.snippets.save()
         self.reload()

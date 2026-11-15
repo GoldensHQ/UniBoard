@@ -1,4 +1,4 @@
-"""Окно истории буфера обмена с поиском, закреплением и вставкой."""
+"""Clipboard history window with search, pinning and pasting."""
 import base64
 import io
 import tkinter as tk
@@ -8,7 +8,7 @@ from pathlib import Path
 from . import theme, winapi
 from .theme import COLORS, FONT_MAIN, FONT_SMALL, FONT_BIG
 
-PLACEHOLDER = "Поиск по истории…"
+PLACEHOLDER = "Search history…"
 
 
 class HistoryWindow:
@@ -20,7 +20,7 @@ class HistoryWindow:
         self.target_hwnd = None
         self._thumb = None
 
-    # --- окно -----------------------------------------------------------------
+    # --- window -----------------------------------------------------------------
 
     def open(self, target_hwnd=None, bring=True):
         if self.win and self.win.winfo_exists():
@@ -31,7 +31,7 @@ class HistoryWindow:
         root = self.app.root
         w = tk.Toplevel(root)
         self.win = w
-        w.title("UniBoard — История буфера")
+        w.title("UniBoard — Clipboard History")
         w.configure(bg=COLORS["bg"], padx=10, pady=10)
         w.geometry("680x480")
         self.target_hwnd = target_hwnd
@@ -81,8 +81,8 @@ class HistoryWindow:
                                 text="", compound="left")
         self.preview.pack(fill="x", pady=(8, 2))
 
-        foot = ("Enter / двойной клик — вставить      Ctrl+P — закрепить      "
-                "Delete — удалить      Esc — закрыть")
+        foot = ("Enter / double-click — paste      Ctrl+P — pin      "
+                "Delete — delete      Esc — close")
         tk.Label(w, text=foot, bg=COLORS["bg"], fg=COLORS["muted"],
                  font=FONT_SMALL, anchor="w").pack(fill="x")
 
@@ -114,7 +114,7 @@ class HistoryWindow:
         if self.win and self.win.winfo_exists():
             self.search.focus_set()
 
-    # --- поиск-плейсхолдер ------------------------------------------------------
+    # --- search placeholder ------------------------------------------------------
 
     def _set_placeholder(self):
         self.search.insert(0, PLACEHOLDER)
@@ -129,7 +129,7 @@ class HistoryWindow:
         if not self.search.get():
             self._set_placeholder()
 
-    # --- данные ----------------------------------------------------------------
+    # --- data ------------------------------------------------------------------
 
     def refresh(self):
         if not (self.win and self.win.winfo_exists()):
@@ -163,11 +163,11 @@ class HistoryWindow:
     def _show_preview(self):
         self._thumb = None
         if not self.items:
-            self.preview.configure(text="История пуста — скопируйте что-нибудь (Ctrl+C).")
+            self.preview.configure(text="History is empty — copy something first (Ctrl+C).")
             return
         it = self.items[self.sel]
         when = datetime.fromtimestamp(it.created).strftime("%d.%m %H:%M")
-        parts = [f"{when}   использований: {it.uses}"]
+        parts = [f"{when}   uses: {it.uses}"]
         if it.text:
             body = it.text if len(it.text) <= 400 else it.text[:400] + "…"
             parts.append(body.replace("\r", ""))
@@ -186,7 +186,7 @@ class HistoryWindow:
                 self.preview.configure(image="")
         self.preview.configure(text="   ".join(parts))
 
-    # --- действия ----------------------------------------------------------------
+    # --- actions ------------------------------------------------------------------
 
     def paste_selected(self):
         if not self.items:
@@ -213,10 +213,10 @@ class HistoryWindow:
         self.app.history.remove(self.items[self.sel].id)
         self.refresh()
 
-    # --- жизненный цикл ------------------------------------------------------------
+    # --- lifecycle ------------------------------------------------------------------
 
     def _on_destroy(self, _e=None):
-        pass  # разрегистрацию HWND делает close()
+        pass  # close() unregisters the HWND
 
     def close(self):
         if self.win and self.win.winfo_exists():

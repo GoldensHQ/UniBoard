@@ -1,4 +1,4 @@
-"""Всплывающее окно подсказок рядом с кареткой (не крадёт фокус)."""
+"""Suggestion popup near the caret (does not steal focus)."""
 import tkinter as tk
 
 from . import winapi
@@ -14,7 +14,7 @@ class SuggestionPopup:
         self.sel = 0
         self._timeout_job = None
 
-    # --- создание виджета ------------------------------------------------------
+    # --- widget creation ------------------------------------------------------
 
     def _ensure(self):
         if self.win and self.win.winfo_exists():
@@ -32,22 +32,22 @@ class SuggestionPopup:
         self.body.pack(fill="x")
         self.body.columnconfigure(0, weight=1)
         self.footer = tk.Label(outer, anchor="w",
-                               text="Ctrl+Space — вставить    клик — выбрать",
+                               text="Ctrl+Space — paste    click — pick",
                                bg=COLORS["panel"], fg=COLORS["muted"],
                                font=FONT_SMALL, padx=10, pady=3)
         self.footer.pack(fill="x")
         w.protocol("WM_DELETE_WINDOW", lambda: None)
-        winapi.set_noactivate(w)  # клик по строке не уводит фокус из приложения
+        winapi.set_noactivate(w)  # clicking a row does not steal focus from the app
         self.win = w
         return w
 
-    # --- показ / обновление / скрытие ------------------------------------------
+    # --- show / update / hide ---------------------------------------------------
 
     def show(self, x, y, entries, sel):
-        """entries: [(icon, display)], sel — выбранный индекс.
+        """entries: [(icon, display)], sel — the selected index.
 
-        Строки переиспользуются (grid + grid_remove), чтобы при быстрой печати
-        не пересоздавать виджеты на каждое нажатие.
+        Rows are reused (grid + grid_remove), so that fast typing
+        does not recreate widgets on every keypress.
         """
         w = self._ensure()
         self.sel = sel
@@ -93,7 +93,7 @@ class SuggestionPopup:
         if self.win and self.win.winfo_exists():
             self.win.withdraw()
 
-    # --- события ----------------------------------------------------------------
+    # --- events ----------------------------------------------------------------
 
     def _row_click(self, idx):
         self.app.worker_q.put(("accept_click", idx))
@@ -115,5 +115,5 @@ class SuggestionPopup:
         self._timeout_job = None
         if self.app.shared.popup_visible:
             self.hide()
-            # сообщаем рабочему потоку, что окно закрылось само
+            # tell the worker thread that the window closed itself
             self.app.worker_q.put(("popup_hidden", None))

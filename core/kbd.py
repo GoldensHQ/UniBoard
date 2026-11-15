@@ -1,4 +1,4 @@
-"""Клавиатура: эмуляция ввода (SendInput), дожитие отпускания комбинаций."""
+"""Keyboard: input emulation (SendInput), waiting for key combinations to be released."""
 import ctypes
 from ctypes import wintypes
 import threading
@@ -48,7 +48,7 @@ VK_LMENU, VK_RMENU = 0xA4, 0xA5
 VK_LBUTTON, VK_RBUTTON, VK_MBUTTON = 0x01, 0x02, 0x04
 VK_XBUTTON1, VK_XBUTTON2 = 0x06, 0x07
 
-# Клавиши, сбрасывающие буфер набора
+# Keys that reset the type buffer
 CLEAR_VKS = frozenset({VK_TAB, VK_RETURN, VK_ESCAPE, VK_SPACE, VK_END, VK_HOME,
                        VK_LEFT, VK_UP, VK_RIGHT, VK_DOWN, VK_INSERT, VK_DELETE,
                        VK_LWIN, VK_RWIN, VK_APPS})
@@ -66,7 +66,7 @@ _MOD_GROUPS = {
 
 
 def mods_now():
-    """Текущие зажатые модификаторы (по GetAsyncKeyState)."""
+    """Currently pressed modifiers (via GetAsyncKeyState)."""
     mods = set()
     for name, vks in _MOD_GROUPS.items():
         for vk in vks:
@@ -117,7 +117,7 @@ user32.SendInput.restype = wintypes.UINT
 user32.GetAsyncKeyState.restype = ctypes.c_short
 
 
-# --- структуры INPUT --------------------------------------------------------
+# --- INPUT structures --------------------------------------------------------
 
 class KEYBDINPUT(ctypes.Structure):
     _fields_ = [("wVk", wintypes.WORD), ("wScan", wintypes.WORD),
@@ -148,10 +148,10 @@ class INPUT(ctypes.Structure):
 user32.SendInput.argtypes = [wintypes.UINT, ctypes.POINTER(INPUT), ctypes.c_int]
 
 
-# --- События клавиатуры: перехват -------------------------------------------
+# --- Keyboard events: interception -------------------------------------------
 
 class KeyboardHook:
-    """Глобальный LL-хук клавиатуры. on_key(ev)->True означает «поглотить клавишу»."""
+    """Global low-level keyboard hook. on_key(ev)->True means "swallow the key"."""
 
     def __init__(self, on_key, on_error=None):
         self._on_key = on_key
@@ -160,7 +160,7 @@ class KeyboardHook:
         self._tid = 0
         self._thread = None
         self._proc = HOOKPROC(self._cb)
-        self._caps = False  # трекаем CapsLock сами (состояние потока-хука недоступно)
+        self._caps = False  # we track CapsLock ourselves (the hook thread's state is not accessible)
 
     def start(self):
         self._thread = threading.Thread(target=self._run, name="UniBoard-KbdHook", daemon=True)
@@ -180,8 +180,8 @@ class KeyboardHook:
         if not self._hook:
             err = ctypes.get_last_error()
             if self._on_error:
-                self._on_error("Не удалось установить перехват клавиатуры "
-                               f"(SetWindowsHookExW, ошибка {err})")
+                self._on_error("Failed to install the keyboard hook "
+                               f"(SetWindowsHookExW, error {err})")
             return
         msg = wintypes.MSG()
         while user32.GetMessageW(ctypes.byref(msg), None, 0, 0) > 0:
@@ -190,27 +190,27 @@ class KeyboardHook:
         user32.UnhookWindowsHookEx(self._hook)
 
     def _cb(self, ncode, wparam, lparam):
-        # МАКСИМАЛЬНО тощий колбэк: никакой расшифровки символов здесь нет.
-        # ToUnicode/ToAscii внутри LL-хука может заморозить ввод всей системы,
-        # поэтому символы раскладки расшифрует отдельный поток (core/decoder.py).
+        # As thin a callback as possible: no character decoding happens here.
+        # ToUnicode/ToAscii inside an LL hook can freeze the whole system's input,
+        # so layout characters are decoded by a separate thread (core/decoder.py).
         try:
             if ncode == 0:
                 info = ctypes.cast(lparam, ctypes.POINTER(KBDLLHOOKSTRUCT)).contents
-                if not info.flags & LLKHF_INJECTED:  # свои инъекции пропускаем
+                if not info.flags & LLKHF_INJECTED:  # skip our own injected input
                     down = wparam in (WM_KEYDOWN, WM_SYSKEYDOWN)
                     if down and info.vkCode == VK_CAPITAL:
                         self._caps = not self._caps
                     ev = KeyEv(info.vkCode, info.scanCode, bool(down), False,
                                mods_now(), self._caps)
                     if self._on_key(ev):
-                        return 1  # поглотить
+                        return 1  # swallow the key
         except Exception:
             pass
         return user32.CallNextHookEx(None, ncode, wparam, lparam)
 
 
 class MouseHook:
-    """LL-хук мыши: уведомляет о нажатиях кнопок (всегда пропускает событие дальше)."""
+    """Low-level mouse hook: reports button presses (always passes the event on)."""
 
     WM_LBUTTONDOWN, WM_RBUTTONDOWN, WM_MBUTTONDOWN = 0x0201, 0x0204, 0x0207
     _BTN = {0x0201: "left", 0x0204: "right", 0x0207: "middle",
@@ -256,7 +256,7 @@ class MouseHook:
         return user32.CallNextHookEx(None, ncode, wparam, lparam)
 
 
-# --- Ввод: эмуляция нажатий --------------------------------------------------
+# --- Input: emulating key presses --------------------------------------------------
 
 def _ki(vk, scan, flags):
     i = INPUT()
@@ -279,7 +279,7 @@ def _send(events, chunk=250):
         if got != n:
             import logging
             logging.getLogger("uniboard").warning(
-                "SendInput: отправлено %d из %d (GetLastError=%s)",
+                "SendInput: sent %d of %d (GetLastError=%s)",
                 got, n, ctypes.get_last_error())
         sent += got
         off += n
@@ -289,12 +289,12 @@ def _send(events, chunk=250):
 
 
 def tap_key(vk, scan=0):
-    """Нажать и отпустить клавишу."""
+    """Press and release a key."""
     _send([_ki(vk, scan, 0), _ki(vk, scan, KEYEVENTF_KEYUP)])
 
 
 def send_backspaces(n):
-    """Отправить n Backspace (удалить набранный триггер в целевом приложении)."""
+    """Send n Backspaces (erase the typed trigger in the target application)."""
     if n <= 0:
         return
     evs = []
@@ -312,12 +312,12 @@ _MOD_REPRESS_VKS = (VK_SHIFT, VK_CONTROL, VK_MENU, VK_LWIN, VK_RWIN)
 
 
 def release_modifiers():
-    """«Отпустить» зажатые модификаторы инъекцией KEYUP.
+    """"Release" the pressed modifiers by injecting KEYUP events.
 
-    Критично после срабатывания RegisterHotKey: пока пользователь держит
-    Ctrl+Space (или Ctrl+Alt+X), система считает Ctrl зажатым, и весь
-    инъектируемый текст доходит до приложения как Ctrl+символ — то есть
-    как шорткаты, а не как печать (наблюдение на реальной системе).
+    Critical after RegisterHotKey fires: while the user is holding
+    Ctrl+Space (or Ctrl+Alt+X), the system considers Ctrl pressed, and all
+    injected input reaches the application as Ctrl+character — that is,
+    as shortcuts rather than typing (observed on a real system).
     """
     evs = [_ki(vk, 0, KEYEVENTF_KEYUP) for vk in _MOD_RELEASE_VKS
            if user32.GetAsyncKeyState(vk) & 0x8000]
@@ -326,10 +326,10 @@ def release_modifiers():
 
 
 def wait_modifiers_released(timeout=0.7):
-    """Дождаться, пока пользователь физически отпустит модификаторы и клавишу
-    горячей комбинации. RegisterHotKey срабатывает, пока клавиши ещё зажаты;
-    инъекция в этот момент может теряться/искажаться в некоторых приложениях,
-    поэтому перед вставкой лучше дождаться отпускания (как делает espanso)."""
+    """Wait until the user physically releases the modifiers and the key of
+    the hot combination. RegisterHotKey fires while the keys are still held;
+    injected input at that moment can be lost/distorted in some applications,
+    so it is better to wait for the release before pasting (as espanso does)."""
     end = time.time() + timeout
     while time.time() < end:
         held = any(user32.GetAsyncKeyState(vk) & 0x8000 for vk in _MOD_REPRESS_VKS)
@@ -341,8 +341,8 @@ def wait_modifiers_released(timeout=0.7):
 
 
 def restore_modifiers():
-    """Вернуть модификаторы, которые пользователь всё ещё держит физически,
-    чтобы его следующие сочетания (Ctrl+C и т.п.) работали как обычно."""
+    """Re-press the modifiers the user is still physically holding,
+    so their next shortcuts (Ctrl+C etc.) work as usual."""
     evs = [_ki(vk, 0, 0) for vk in _MOD_REPRESS_VKS
            if user32.GetAsyncKeyState(vk) & 0x8000]
     if evs:
@@ -350,7 +350,7 @@ def restore_modifiers():
 
 
 def type_text(text):
-    """Напечатать текст событиями UNICODE (работает в любой раскладке)."""
+    """Type text using UNICODE events (works with any keyboard layout)."""
     text = text.replace("\r\n", "\n").replace("\r", "\n")
     evs = []
     for ch in text:
@@ -367,7 +367,7 @@ def type_text(text):
 
 
 def press_ctrl_v():
-    """Ctrl+V — вставка из буфера обмена."""
+    """Ctrl+V — paste from the clipboard."""
     _send([_ki(VK_CONTROL, 0x1D, 0)])
     threading.Event().wait(0.02)
     _send([_ki(ord("V"), 0x2F, 0), _ki(ord("V"), 0x2F, KEYEVENTF_KEYUP)])

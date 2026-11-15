@@ -1,18 +1,18 @@
 # -*- coding: utf-8 -*-
-"""Тест буфера обмена: текст, файлы, изображение, резервное копирование."""
+"""Clipboard test: text, files, image, backup."""
 import sys
 sys.path.insert(0, ".")
 
 from core import clipboard
 from PIL import Image
 
-# бережём текущее содержимое буфера пользователя
+# preserve the user's current clipboard contents
 saved = clipboard.backup()
 
 try:
-    clipboard.write_text("Тест UniBoard ✓ 語")
+    clipboard.write_text("UniBoard test ✓ 語")
     d = clipboard.read_all()
-    assert d["text"] == "Тест UniBoard ✓ 語", repr(d["text"])
+    assert d["text"] == "UniBoard test ✓ 語", repr(d["text"])
     print("text OK")
 
     clipboard.write_files(["C:\\Windows", "C:\\Program Files"])
@@ -33,7 +33,7 @@ try:
     print("write_image OK")
 
     b = clipboard.backup()
-    clipboard.write_text("второй")
+    clipboard.write_text("second")
     clipboard.restore(b)
     d4 = clipboard.read_all()
     assert d4["image"] is not None and d4["text"] is None, (d4["text"], d4["image"])

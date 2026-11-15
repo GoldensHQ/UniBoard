@@ -1,12 +1,12 @@
-"""Расшифровка клавиш в символы раскладки — ВНЕ потока низкоуровневого хука.
+"""Decoding keys into layout characters — OUTSIDE the low-level hook thread.
 
-Вызов ToUnicode/ToAscii из колбэка WH_KEYBOARD_LL — известная причина
-общесистемного зависания ввода: если активное окно не отвечает, хук-колбэк
-виснет вместе со всей клавиатурой. Поэтому:
-  * хук крадёт клавиши мгновенно и решает только «поглотить/пропустить»;
-  * символ для буфера набора расшифровывает этот отдельный поток;
-  * если ToUnicodeEx не ответил за таймаут — декодер помечается «умершим»
-    и подсказки отключаются, но система и UniBoard продолжают работать.
+Calling ToUnicode/ToAscii from a WH_KEYBOARD_LL callback is a well-known
+cause of system-wide input freeze: if the active window stops responding,
+the hook callback hangs along with the entire keyboard. Therefore:
+  * the hook steals keys instantly and only decides "swallow or pass";
+  * the character for the type buffer is decoded by this separate thread;
+  * if ToUnicodeEx does not answer within the timeout, the decoder is marked
+    "dead" and suggestions are disabled, but the system and UniBoard keep working.
 """
 import ctypes
 from ctypes import wintypes
@@ -27,17 +27,17 @@ user32.ToUnicodeEx.restype = ctypes.c_int
 user32.GetKeyboardLayout.argtypes = [wintypes.DWORD]
 user32.GetKeyboardLayout.restype = ctypes.c_size_t
 
-DECODE_TIMEOUT = 0.12  # сек: сколько ждём ответа декодера
+DECODE_TIMEOUT = 0.12  # sec: how long we wait for the decoder's answer
 
 
 def _decode(vk, scan, mods, caps):
-    """Виртуальная клавиша -> символ раскладки (ToUnicodeEx), иначе None."""
+    """Virtual key -> keyboard layout character (ToUnicodeEx), otherwise None."""
     if vk in kbd.MODIFIER_VKS or vk in kbd.CLEAR_VKS or 0x70 <= vk <= 0x87:
         return None
     if "win" in mods:
         return None
     if ("ctrl" in mods) != ("alt" in mods):
-        return None  # шорткаты (Ctrl+C, Alt+…) — это не печатание
+        return None  # shortcuts (Ctrl+C, Alt+…) are not typing
     state = (wintypes.BYTE * 256)()
     if "shift" in mods:
         state[kbd.VK_SHIFT] = state[kbd.VK_LSHIFT] = 0x80
@@ -47,7 +47,7 @@ def _decode(vk, scan, mods, caps):
         state[kbd.VK_MENU] = state[kbd.VK_LMENU] = 0x80
     if caps:
         state[kbd.VK_CAPITAL] = 1
-    # раскладка берётся у потока активного окна (раскладки могут быть разные)
+    # the layout is taken from the active window's thread (layouts may differ)
     fg = winapi.fg_hwnd()
     tid = user32.GetWindowThreadProcessId(fg, None) if fg else 0
     hkl = user32.GetKeyboardLayout(tid) if tid else user32.GetKeyboardLayout(0)
@@ -61,7 +61,7 @@ def _decode(vk, scan, mods, caps):
 
 
 class CharDecoder(threading.Thread):
-    """Однозадачный поток-расшифровщик с таймаутом и аварийным отключением."""
+    """Single-purpose decoder thread with a timeout and emergency shutdown."""
 
     def __init__(self):
         super().__init__(name="UniBoard-Decoder", daemon=True)
@@ -82,15 +82,15 @@ class CharDecoder(threading.Thread):
             self.done.set()
 
     def decode(self, vk, scan, mods, caps):
-        """Символ для буфера набора; None — если декодер умер или символа нет."""
+        """Character for the type buffer; None — if the decoder is dead or there is no character."""
         if self.dead:
             return None
         self.done.clear()
         self.q.put((vk, scan, frozenset(mods), caps))
         if not self.done.wait(DECODE_TIMEOUT):
             self.dead = True
-            log.error("Декодер раскладки не ответил за %.2f с — подсказки "
-                      "отключены до перезапуска UniBoard (система не пострадала).",
+            log.error("The layout decoder did not respond within %.2f s — suggestions "
+                      "are disabled until UniBoard is restarted (the system was not affected).",
                       DECODE_TIMEOUT)
             return None
         return self.result

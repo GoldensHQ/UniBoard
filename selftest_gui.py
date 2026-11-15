@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""GUI smoke-тест: окна истории, настроек и всплывающая подсказка."""
+"""GUI smoke test: history window, settings window and popup."""
 import sys
 sys.path.insert(0, ".")
 
@@ -23,7 +23,7 @@ app.settings_win.open()
 app.root.update()
 
 app.popup.show(120, 120, [("🔗", "https://example.com/very-long-link"),
-                          ("📋", "Обычный текст из истории")], 0)
+                          ("📋", "Plain text from history")], 0)
 app.root.update()
 app.popup.update_sel(1)
 app.root.update()

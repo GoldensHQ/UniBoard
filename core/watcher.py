@@ -1,4 +1,4 @@
-"""Наблюдатель буфера обмена: замечает новое копирование и пишет в историю."""
+"""Clipboard watcher: notices new copies and records them into history."""
 import threading
 import time
 import uuid
@@ -31,7 +31,7 @@ class ClipboardWatcher(threading.Thread):
         if seq == self._last_seq:
             return
         self._last_seq = seq
-        # Наши собственные вставки/восстановления пропускаем
+        # Skip our own pastes/restores
         if time.time() < getattr(self.app, "suppress_until", 0):
             return
         if not self.app.cfg.get("record_enabled", True):

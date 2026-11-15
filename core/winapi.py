@@ -1,4 +1,4 @@
-"""Минимальные WinAPI-обёртки: каретка, окна, мониторы, процессы."""
+"""Minimal WinAPI wrappers: caret, windows, monitors, processes."""
 import ctypes
 from ctypes import wintypes
 from pathlib import Path
@@ -36,7 +36,7 @@ class MONITORINFO(ctypes.Structure):
                 ("rcWork", RECT), ("dwFlags", wintypes.DWORD)]
 
 
-# restype/argtypes (важно для x64 — иначе обрезаются указатели)
+# restype/argtypes (important for x64 — otherwise pointers are truncated)
 user32.GetForegroundWindow.restype = wintypes.HWND
 user32.SetForegroundWindow.argtypes = [wintypes.HWND]
 user32.SetForegroundWindow.restype = wintypes.BOOL
@@ -69,7 +69,7 @@ def fg_hwnd():
 
 
 def fg_process_name():
-    """Имя .exe активного окна в нижнем регистре, например 'chrome.exe'."""
+    """Lowercase .exe name of the active window's process, e.g. 'chrome.exe'."""
     hwnd = fg_hwnd()
     if not hwnd:
         return ""
@@ -91,7 +91,7 @@ def fg_process_name():
 
 
 def caret_screen_pos():
-    """Позиция текстового курсера (каретки) на экране; запасной вариант — мышь."""
+    """Screen position of the text caret; fallback — the mouse position."""
     gti = GUITHREADINFO()
     gti.cbSize = ctypes.sizeof(GUITHREADINFO)
     if user32.GetGUIThreadInfo(0, ctypes.byref(gti)) and gti.hwndCaret:
@@ -110,7 +110,7 @@ def cursor_pos():
 
 
 def workarea_at(x, y):
-    """Рабочая область монитора (без панели задач), содержащая точку."""
+    """Work area of the monitor (without the taskbar) containing the point."""
     mi = MONITORINFO()
     mi.cbSize = ctypes.sizeof(MONITORINFO)
     hmon = user32.MonitorFromPoint(POINT(int(x), int(y)), MONITOR_DEFAULTTONEAREST)
@@ -130,7 +130,7 @@ def window_center(hwnd):
 
 
 def tk_root_hwnd(widget):
-    """Настоящий HWND окна tkinter (обёртка Toplevel)."""
+    """The real HWND of the tkinter window (a Toplevel wrapper)."""
     try:
         return user32.GetAncestor(widget.winfo_id(), GA_ROOT)
     except Exception:
@@ -138,8 +138,8 @@ def tk_root_hwnd(widget):
 
 
 def set_noactivate(widget):
-    """WS_EX_NOACTIVATE: клики по окну не переносят на него фокус —
-    подсказка не «крадёт» активное окно при клике по её строкам."""
+    """WS_EX_NOACTIVATE: clicks on the window do not move focus to it —
+    the suggestion does not "steal" the active window when its rows are clicked."""
     hwnd = tk_root_hwnd(widget)
     if not hwnd:
         return False

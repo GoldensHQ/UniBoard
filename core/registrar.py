@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
-"""Горячие клавиши без низкоуровневых хуков.
+"""Hotkeys without low-level hooks.
 
-RegisterHotKey — официальный API ОС: система сама вызывает наш обработчик,
-никакого глобального перехвата клавиатуры нет. Все действия UniBoard
-(вставка подсказки, история, «вставить последний») идут через этот механизм.
+RegisterHotKey is an official OS API: the system itself invokes our handler,
+there is no global keyboard interception. All UniBoard actions (inserting a
+suggestion, history, "paste the last item") go through this mechanism.
 """
 import ctypes
 import logging
@@ -25,8 +25,8 @@ MAX_SLOTS = 8
 
 
 class HotkeyRegistrar:
-    """Регистрирует горячие клавиши на свой поток (hwnd=None → WM_HOTKEY
-    приходит в очередь потока)."""
+    """Registers hotkeys on its own thread (hwnd=None → WM_HOTKEY
+    arrives in the thread's message queue)."""
 
     def __init__(self, app):
         self.app = app
@@ -46,7 +46,7 @@ class HotkeyRegistrar:
             self._thread.join(timeout=2)
 
     def reload(self):
-        """Перерегистрировать клавиши (после смены настроек)."""
+        """Re-register the keys (after settings change)."""
         if self._tid:
             user32.PostThreadMessageW(self._tid, WM_APP_RELOAD, 0, 0)
 
@@ -62,10 +62,10 @@ class HotkeyRegistrar:
             if user32.RegisterHotKey(None, FIRST_ID + i, mods, hk.vk):
                 self._ids[FIRST_ID + i] = hk.name
             else:
-                log.warning("RegisterHotKey не принял %s (возможно, занято другой "
-                            "программой)", hk.raw)
+                log.warning("RegisterHotKey rejected %s (possibly already taken "
+                            "by another program)", hk.raw)
         if not self._ids and hotkeys:
-            log.error("Ни одна горячая клавиша не зарегистрирована")
+            log.error("No hotkey was registered")
 
     def _run(self):
         self._tid = winapi.kernel32.GetCurrentThreadId()

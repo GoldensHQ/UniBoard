@@ -1,7 +1,7 @@
-"""UniBoard — умный настраиваемый менеджер буфера обмена.
+"""UniBoard — smart customizable clipboard manager.
 
-Оркестратор: потоки (Raw Input-слушатель клавиатуры, RegisterHotKey,
-наблюдатель буфера, трей), логика подсказок при печати и вставки.
+Orchestrator: threads (Raw Input keyboard listener, RegisterHotKey,
+clipboard watcher, tray), typing-suggestion logic and pasting.
 """
 import logging
 import os
@@ -25,11 +25,11 @@ from .settings_ui import SettingsWindow
 
 log = logging.getLogger("uniboard")
 
-MAX_BUFFER = 64  # длина буфера набора (три измеримых префикса с запасом)
+MAX_BUFFER = 64  # typing buffer length (three measurable prefixes with margin)
 
 
 class Shared:
-    """Состояние для мгновенных синхронных проверок прямо в хуке клавиатуры."""
+    """State for instant synchronous checks right inside the keyboard hook."""
 
     __slots__ = ("popup_visible", "cand_count", "popup_rect")
 
@@ -40,7 +40,7 @@ class Shared:
 
 
 def focus_window(hwnd):
-    """Перевести фокус на окно (Alt-трюк против ограничений SetForegroundWindow)."""
+    """Move focus to a window (Alt trick to work around SetForegroundWindow limits)."""
     if not hwnd:
         return
     try:
@@ -60,16 +60,16 @@ class App:
         self.snippets = Snippets()
         self.history = History(capacity=int(self.cfg.get("history_size", 500)))
         self.shared = Shared()
-        self.ui_q = queue.Queue()      # → главный поток (tk)
-        self.worker_q = queue.Queue()  # → рабочий поток (логика и вставки)
+        self.ui_q = queue.Queue()      # → main thread (tk)
+        self.worker_q = queue.Queue()  # → worker thread (logic and insertions)
         self.our_hwnds = set()
         self.suppress_until = 0.0
         self.hotkeys = load_hotkeys(self.cfg)
 
-        self.buffer = ""       # что пользователь напечатал «вслепую»
-        self.cands = []        # текущие кандидаты подсказки
+        self.buffer = ""       # what the user typed "blindly"
+        self.cands = []        # current suggestion candidates
         self.sel = 0
-        self.showing = False   # мы считаем окно подсказки открытым
+        self.showing = False   # we consider the suggestion popup open
         self._closing = False
 
         self.root = None
@@ -81,44 +81,44 @@ class App:
         self.decoder = None
         self.registrar = None
         self.tray = None
-        self.self_inject_until = 0.0  # игнорировать Raw Input во время своей инъекции
-        self._popup_fg = None         # окно, поверх которого показана подсказка
+        self.self_inject_until = 0.0  # ignore Raw Input during our own injection
+        self._popup_fg = None         # window the suggestion popup is shown over
 
-    # ================================ ЗАПУСК =================================
+    # ================================ STARTUP =================================
 
     def run(self):
-        log.info("Шаг 1/6: интерфейс (tkinter)")
+        log.info("Step 1/6: UI (tkinter)")
         self.root = tk.Tk()
-        self.root.withdraw()  # само приложение живёт в трее
+        self.root.withdraw()  # the app itself lives in the tray
         self.popup = SuggestionPopup(self, self.root)
         self.history_win = HistoryWindow(self)
         self.settings_win = SettingsWindow(self)
 
-        # декодер раскладки запускаем ДО хуков: рабочий поток обязан его знать
-        log.info("Шаг 2/6: декодер раскладки")
+        # start the keyboard layout decoder BEFORE hooks: the worker thread must know it
+        log.info("Step 2/6: keyboard layout decoder")
         self.decoder = CharDecoder()
         self.decoder.start()
 
-        log.info("Шаг 3/6: наблюдатель буфера обмена")
+        log.info("Step 3/6: clipboard watcher")
         self.watcher = ClipboardWatcher(self)
         self.watcher.start()
 
-        # Raw Input + RegisterHotKey: НИКАКИХ низкоуровневых хуков.
-        log.info("Шаг 4/6: слушатель клавиатуры (Raw Input, без хуков)")
+        # Raw Input + RegisterHotKey: NO low-level hooks.
+        log.info("Step 4/6: keyboard listener (Raw Input, no hooks)")
         self.rawinput = RawInputListener(
             lambda ev: self.worker_q.put(("key", ev)),
             on_error=lambda m: log.error("Raw Input: %s", m))
         self.rawinput.start()
-        log.info("Шаг 4b: горячие клавиши (RegisterHotKey)")
+        log.info("Step 4b: hotkeys (RegisterHotKey)")
         self.registrar = HotkeyRegistrar(self)
         self.registrar.start()
 
-        log.info("Шаг 5/6: рабочий поток")
+        log.info("Step 5/6: worker thread")
         threading.Thread(target=self._worker, name="UniBoard-Worker",
                          daemon=True).start()
-        log.info("Шаг 6/6: значок в трее")
+        log.info("Step 6/6: tray icon")
         self._make_tray()
-        log.info("UniBoard готов — основной цикл запущен")
+        log.info("UniBoard ready — main loop running")
 
         self.root.after(25, self.poll)
         try:
@@ -126,12 +126,12 @@ class App:
         finally:
             self.shutdown()
 
-    # ===================== КЛАВИАТУРА (БЕЗ ХУКОВ) =============================
-    # Raw Input ДОСТАВЛЯЕТ события асинхронно и не ждёт нас — системный фриз
-    # по построению невозможен. «Поглотить» клавишу нельзя, поэтому все
-    # действия (вставка подсказки, история) — через RegisterHotKey.
+    # ===================== KEYBOARD (NO HOOKS) =============================
+    # Raw Input DELIVERS events asynchronously and does not wait for us — a
+    # system freeze is impossible by construction. A key cannot be swallowed,
+    # so all actions (suggestion insertion, history) go through RegisterHotKey.
 
-    def _start_listeners(self):  # пере-старт после смены настроек (запас на будущее)
+    def _start_listeners(self):  # restart after settings change (future-proofing)
         try:
             if self.rawinput:
                 self.rawinput.stop()
@@ -151,7 +151,7 @@ class App:
         self.registrar = HotkeyRegistrar(self)
         self.registrar.start()
 
-    # ============================== РАБОЧИЙ ПОТОК =============================
+    # ============================ WORKER THREAD =============================
 
     def _worker(self):
         while True:
@@ -177,11 +177,11 @@ class App:
                 elif op == "exit":
                     return
             except Exception:
-                log.exception("Ошибка в рабочем потоке")
+                log.exception("Error in worker thread")
 
     def _on_key(self, ev):
-        # Собственные инъекции (Backspace/текст/Ctrl+V) Raw Input видит как
-        # обычные клавиши — игнорируем события в окне после инъекции.
+        # Our own injections (Backspace/text/Ctrl+V) look like regular keys to
+        # Raw Input — ignore events within the window after an injection.
         if time.time() < self.self_inject_until:
             return
         if not ev.down:
@@ -192,7 +192,7 @@ class App:
             return
         vk = ev.vk
 
-        # Esc не поглотить (нет хука), но состояние подсказки сбросим.
+        # Esc cannot be swallowed (no hook), but reset the suggestion state.
         if self.showing and vk == kbd.VK_ESCAPE:
             self._clear()
             return
@@ -209,7 +209,7 @@ class App:
             return
         if self.decoder.dead or not self.cfg.get("suggest_enabled", True):
             return
-        # расшифровка символа — только в отдельном потоке (см. decoder.py)
+        # character decoding — only in a separate thread (see decoder.py)
         ch = self.decoder.decode(vk, ev.scan, ev.mods, ev.caps)
         if not ch:
             return
@@ -219,7 +219,7 @@ class App:
         self.buffer = (self.buffer + ch)[-MAX_BUFFER:]
         self._refresh(fg)
 
-    # ------------------------- подсказки -------------------------------------
+    # ------------------------- suggestions -----------------------------------
 
     def _refresh(self, fg=None):
         if fg is None:
@@ -265,7 +265,7 @@ class App:
         self._hide_popup()
 
     def _forget_popup(self):
-        """Окно закрылось само по таймауту (сообщение из главного потока)."""
+        """The window closed by itself on timeout (message from the main thread)."""
         self.showing = False
         self.buffer = ""
         self.cands = []
@@ -280,7 +280,7 @@ class App:
         self.ui_q.put(("popup_sel", self.sel))
 
     def on_popup_hover(self, idx):
-        """Наведение мыши на строку подсказки (главный поток)."""
+        """Mouse hover on a suggestion row (main thread)."""
         self.popup.update_sel(idx)
         self.worker_q.put(("sel_moved", idx))
 
@@ -290,9 +290,9 @@ class App:
         try:
             if n:
                 self.self_inject_until = time.time() + 2.0
-                # Дождаться отпускания Ctrl+Space (иначе Backspace может
-                # потеряться в некоторых приложениях), затем гарантированно
-                # «отпустить» модификаторы инъекцией.
+                # Wait for Ctrl+Space to be released (otherwise Backspace may
+                # get lost in some apps), then reliably "release" the
+                # modifiers via injection.
                 kbd.wait_modifiers_released()
                 kbd.release_modifiers()
                 kbd.send_backspaces(n)
@@ -302,17 +302,17 @@ class App:
             if cand.ref is not None:
                 self.history.bump(cand.ref.id)
         except Exception:
-            log.exception("Не удалось вставить подсказку")
+            log.exception("Failed to insert suggestion")
         finally:
             self.self_inject_until = time.time() + 0.6
 
     def _accept_current(self):
-        """Горячая клавиша «вставить подсказку» (Ctrl+Space): верхний вариант
-        из текущего буфера (или выделенный, если окно открыто)."""
+        """The "insert suggestion" hotkey (Ctrl+Space): the top candidate
+        from the current typing buffer (or the selected one if the popup is open)."""
         if self.showing and self.cands:
             self._accept(self.cands[self.sel])
 
-    # ------------------------- вставки ---------------------------------------
+    # ------------------------- pasting ---------------------------------------
 
     def _insert_text(self, text):
         if self.cfg.get("insert_mode", "unicode") == "unicode":
@@ -344,7 +344,7 @@ class App:
         time.sleep(0.04)
         self.self_inject_until = time.time() + 3.0
         kbd.wait_modifiers_released()
-        kbd.release_modifiers()  # см. kbd.release_modifiers — hotkey-комбо
+        kbd.release_modifiers()  # see kbd.release_modifiers — hotkey combo
         restore = self.cfg.get("restore_clipboard", True)
         b = clipboard.backup() if restore else None
         try:
@@ -363,7 +363,7 @@ class App:
                     return
                 if self.cfg.get("insert_mode", "unicode") == "unicode":
                     kbd.type_text(text)
-                    b = None  # буфер обмена не трогали
+                    b = None  # clipboard was not touched
                 else:
                     clipboard.write_text(text)
                     time.sleep(0.02)
@@ -380,7 +380,7 @@ class App:
     def _hotkey(self, name):
         now = time.time()
         last = getattr(self, "_last_hotkey", ("", 0))
-        if last[0] == name and now - last[1] < 0.3:  # защита от автоповтора
+        if last[0] == name and now - last[1] < 0.3:  # auto-repeat protection
             return
         self._last_hotkey = (name, now)
         if name == "history":
@@ -392,13 +392,14 @@ class App:
         elif name == "accept":
             self._accept_current()
 
-    # ============================ ГЛАВНЫЙ ПОТОК ===============================
+    # ============================ MAIN THREAD ===============================
 
     def poll(self):
         if self._closing:
             return
-        # Подсказка видна, но фокус ушёл в другое окно? Скрываем (мышь
-        # «съесть» нельзя без хука — закрываемся по смене активного окна).
+        # Suggestion visible but focus moved to another window? Hide it (the
+        # mouse cannot be captured without a hook — we close on active-window
+        # change).
         if self.showing and self._popup_fg and winapi.fg_hwnd() != self._popup_fg:
             self._popup_fg = None
             self.worker_q.put(("clear_state", None))
@@ -429,7 +430,7 @@ class App:
             elif op == "shutdown":
                 self.shutdown()
         except Exception:
-            log.exception("Ошибка интерфейса")
+            log.exception("UI error")
 
     def on_history_changed(self):
         self.history.maybe_save()
@@ -444,7 +445,7 @@ class App:
             self.registrar.reload()
         if autostart is not None and autostart != cfgmod.autostart_enabled():
             if not cfgmod.set_autostart(autostart):
-                log.warning("Не удалось изменить автозапуск в реестре")
+                log.warning("Failed to change autostart in the registry")
 
     def _toggle_suggest(self):
         self.cfg.set("suggest_enabled", not self.cfg.get("suggest_enabled", True))
@@ -455,7 +456,7 @@ class App:
         self.cfg.set("record_enabled", not self.cfg.get("record_enabled", True))
         self.cfg.save()
 
-    # ================================= ТРЕЙ ===================================
+    # ================================= TRAY ===================================
 
     def _make_tray(self):
         try:
@@ -474,30 +475,30 @@ class App:
                 return img
 
             menu = pystray.Menu(
-                pystray.MenuItem("История буфера",
+                pystray.MenuItem("Clipboard history",
                                  lambda *_: self.ui_q.put(("open_history", winapi.fg_hwnd())),
                                  default=True),
-                pystray.MenuItem("Настройки", lambda *_: self.ui_q.put(("open_settings", None))),
+                pystray.MenuItem("Settings", lambda *_: self.ui_q.put(("open_settings", None))),
                 pystray.Menu.SEPARATOR,
-                pystray.MenuItem("Подсказки",
+                pystray.MenuItem("Suggestions",
                                  lambda *_: self._toggle_suggest(),
                                  checked=lambda *_: bool(self.cfg.get("suggest_enabled", True))),
-                pystray.MenuItem("Запись буфера",
+                pystray.MenuItem("Clipboard recording",
                                  lambda *_: self._toggle_record(),
                                  checked=lambda *_: bool(self.cfg.get("record_enabled", True))),
                 pystray.Menu.SEPARATOR,
-                pystray.MenuItem("Выход", lambda *_: self.ui_q.put(("shutdown", None))),
+                pystray.MenuItem("Exit", lambda *_: self.ui_q.put(("shutdown", None))),
             )
             self.tray = pystray.Icon("UniBoard", icon_image(),
-                                     "UniBoard — умный буфер обмена", menu)
+                                     "UniBoard — smart clipboard", menu)
             self.tray.run_detached()
-            self.tray.notify("Работаю в трее. Ctrl+Alt+V — история, "
-                             "Ctrl+Space — вставить подсказку.", "UniBoard")
-            log.info("Трей активен")
+            self.tray.notify("Running in the tray. Ctrl+Alt+V — history, "
+                             "Ctrl+Space — insert suggestion.", "UniBoard")
+            log.info("Tray active")
         except Exception:
-            log.exception("Не удалось запустить значок в трее")
+            log.exception("Failed to start the tray icon")
 
-    # =============================== ЗАВЕРШЕНИЕ ================================
+    # =============================== SHUTDOWN ================================
 
     def shutdown(self):
         if self._closing:
@@ -543,26 +544,26 @@ class App:
 
 def main():
     cfgmod.LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
-    # Диагностика зависаний: UNIBOARD_FAULT=1 → дамп стеков всех потоков каждые 5 с
+    # Hang diagnostics: UNIBOARD_FAULT=1 → dump stacks of all threads every 5 s
     if os.getenv("UNIBOARD_FAULT"):
         import faulthandler
         fh = open(cfgmod.app_dir() / "fault.log", "w", encoding="utf-8", buffering=1)
         faulthandler.enable(fh)
         faulthandler.dump_traceback_later(5, repeat=True, file=fh)
     handlers = [logging.FileHandler(cfgmod.LOG_PATH, encoding="utf-8")]
-    if sys.stdout and sys.stderr:  # консольный запуск (uniboard.py)
+    if sys.stdout and sys.stderr:  # console run (uniboard.py)
         handlers.append(logging.StreamHandler())
     logging.basicConfig(level=logging.INFO, handlers=handlers,
                         format="%(asctime)s %(levelname)s %(name)s: %(message)s")
-    log.info("Запуск UniBoard")
+    log.info("Starting UniBoard")
     try:
         App().run()
     except Exception:
-        log.exception("Фатальная ошибка")
+        log.exception("Fatal error")
         try:
             import ctypes
             ctypes.windll.user32.MessageBoxW(
-                0, "UniBoard упал при запуске — подробности в логе:\n%s" % cfgmod.LOG_PATH,
+                0, "UniBoard crashed on startup — details in the log:\n%s" % cfgmod.LOG_PATH,
                 "UniBoard", 0x10)
         except Exception:
             pass

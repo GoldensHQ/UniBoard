@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Точка входа UniBoard (с консолью — удобно для отладки)."""
+"""UniBoard entry point (with console — handy for debugging)."""
 import os
 import sys
 
