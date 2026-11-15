@@ -20,7 +20,13 @@ you paste what you copied faster: while you type, it shows a suggestion, and
 
 ## Install & run
 
-Requires Python 3.10+.
+**Installer (easiest).** Download `UniBoard-Setup-*.exe` from the
+[Releases](https://github.com/GoldensHQ/UniBoard/releases) page and run it —
+per-user install (no admin rights), Start-menu shortcut, optional desktop
+shortcut and autostart, full uninstaller. User data (`%APPDATA%\UniBoard`)
+survives uninstallation.
+
+**From source.** Requires Python 3.10+.
 
 ```bat
 cd UniBoard
