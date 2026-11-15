@@ -33,6 +33,7 @@ class HistoryWindow:
         self.win = w
         w.title("UniBoard — Clipboard History")
         w.configure(bg=COLORS["bg"], padx=10, pady=10)
+        theme.apply_icon(w)
         w.geometry("680x480")
         self.target_hwnd = target_hwnd
         self._position(w)

@@ -10,6 +10,7 @@ import sys
 import threading
 import time
 import tkinter as tk
+from pathlib import Path
 
 from . import clipboard, kbd, theme, winapi
 from . import config as cfgmod
@@ -464,6 +465,12 @@ class App:
             from PIL import Image, ImageDraw, ImageFont
 
             def icon_image():
+                # Логотип из assets (если есть), иначе рисуем «U» на лету
+                try:
+                    p = Path(__file__).resolve().parent.parent / "assets" / "icon.png"
+                    return Image.open(p).convert("RGBA")
+                except Exception:
+                    pass
                 img = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
                 d = ImageDraw.Draw(img)
                 d.rounded_rectangle((2, 2, 62, 62), radius=14, fill=(47, 76, 246, 255))

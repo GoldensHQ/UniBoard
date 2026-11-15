@@ -142,3 +142,7 @@ UniBoard/
 - Dynamic snippets (date/time, input prompts on expansion).
 - Cloud sync of history across PCs.
 - Usage statistics: what and how often you paste.
+
+## License
+
+MIT — see [LICENSE](LICENSE).

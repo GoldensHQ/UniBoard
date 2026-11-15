@@ -26,6 +26,8 @@ class SuggestionPopup:
         w.attributes("-alpha", 0.97)
         w.configure(bg=COLORS["border"], bd=0, highlightthickness=1,
                     highlightbackground=COLORS["border"])
+        from . import theme
+        theme.apply_icon(w)
         outer = tk.Frame(w, bg=COLORS["panel"], padx=3, pady=3)
         outer.pack(fill="both", expand=True)
         self.body = tk.Frame(outer, bg=COLORS["panel"])

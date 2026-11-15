@@ -1,4 +1,5 @@
 """UniBoard dark theme for tkinter windows."""
+from pathlib import Path
 
 COLORS = {
     "bg": "#1e1f24",        # window background
@@ -22,6 +23,18 @@ FONT_MONO = ("Consolas", 9)
 def apply_dark(root):
     """Paint the window with the dark theme."""
     root.configure(bg=COLORS["bg"])
+
+
+def apply_icon(win):
+    """Set the UniBoard logo as the window icon (taskbar/title bar)."""
+    try:
+        from PIL import Image, ImageTk
+        p = Path(__file__).resolve().parent.parent / "assets" / "icon.png"
+        img = ImageTk.PhotoImage(Image.open(p))
+        win.iconphoto(True, img)
+        win._app_icon = img  # keep a reference (tkinter does not hold one)
+    except Exception:
+        pass
 
 
 def trunc(s, n):

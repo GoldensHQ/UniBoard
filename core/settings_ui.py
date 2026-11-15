@@ -2,7 +2,7 @@
 import tkinter as tk
 from tkinter import ttk
 
-from . import config as cfgmod, winapi
+from . import config as cfgmod, theme, winapi
 from .config import Hotkey
 from .theme import COLORS, FONT_MAIN, FONT_SMALL, FONT_BIG
 
@@ -38,6 +38,7 @@ class SettingsWindow:
         self.win = w
         w.title("UniBoard — Settings")
         w.configure(bg=COLORS["bg"], padx=14, pady=12)
+        theme.apply_icon(w)
         w.geometry("560x640")
         w.transient(self.app.root)
         hwnd = winapi.tk_root_hwnd(w)
@@ -254,6 +255,7 @@ class SnippetEditor:
         self.win = w
         w.title("UniBoard — Snippets")
         w.configure(bg=COLORS["bg"], padx=12, pady=10)
+        theme.apply_icon(w)
         w.geometry("560x420")
         w.transient(self.app.root)
         hwnd = winapi.tk_root_hwnd(w)
