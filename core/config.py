@@ -130,13 +130,22 @@ _RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
 
 def set_autostart(enable: bool) -> bool:
     try:
-        import winreg
-        exe = Path(__file__).resolve().parent.parent / "uniboard.pyw"
         import sys
-        py = Path(sys.executable)
-        if py.name.lower() == "python.exe":
-            py = py.with_name("pythonw.exe")
-        val = f'"{py}" "{exe}"'
+        import winreg
+        if getattr(sys, "frozen", False):
+            # Running as packaged UniBoard.exe — register the exe itself
+            val = f'"{sys.executable}"'
+        else:
+            # Prefer the packaged exe if it has been built, else pythonw + script
+            bundled = Path(__file__).resolve().parent.parent / "dist" / "UniBoard.exe"
+            if bundled.exists():
+                val = f'"{bundled}"'
+            else:
+                exe = Path(__file__).resolve().parent.parent / "uniboard.pyw"
+                py = Path(sys.executable)
+                if py.name.lower() == "python.exe":
+                    py = py.with_name("pythonw.exe")
+                val = f'"{py}" "{exe}"'
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, _RUN_KEY, 0,
                             winreg.KEY_SET_VALUE) as k:
             if enable:

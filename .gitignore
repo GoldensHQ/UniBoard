@@ -3,12 +3,16 @@ __pycache__/
 *.pyc
 *.pyo
 
-# Диагностика/логи (живут в %APPDATA%\UniBoard, но на всякий случай)
+# PyInstaller build artifacts (the spec is committed, dist/ is rebuilt on demand)
+build/
+dist/
+
+# Diagnostics/logs (live in %APPDATA%\UniBoard, just in case)
 *.log
 fault.log
 diag_*
 
-# Служебное
+# Misc
 .vscode/
 .idea/
 Thumbs.db

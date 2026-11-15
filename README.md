@@ -31,8 +31,19 @@ The script installs the dependencies (`pillow`, `pystray`, `pywin32`) on the
 first run and starts the app without a console window. A "U" tray icon appears
 after launch.
 
-For debugging, run it with a console: `py -3 uniboard.py` (the log is also
-printed to the screen; the full log is always in `%APPDATA%\UniBoard\uniboard.log`).
+**Packaged exe (recommended).** Build it once with PyInstaller — the exe carries
+the UniBoard logo (taskbar, tray) and needs no Python on the machine:
+
+```bat
+py -3 -m pip install pyinstaller
+py -3 -m PyInstaller --noconfirm --onefile --windowed --name UniBoard ^
+    --icon assets\uniboard.ico --add-data "assets;assets" uniboard.pyw
+```
+
+The result is `dist\UniBoard.exe` (the committed `UniBoard.spec` has the same
+settings: `py -3 -m PyInstaller UniBoard.spec`). For debugging, run with a
+console: `py -3 uniboard.py` (the log is also printed to the screen; the full
+log is always in `%APPDATA%\UniBoard\uniboard.log`).
 
 ## How to use
 
