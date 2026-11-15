@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Диагностика/логи (живут в %APPDATA%\UniBoard, но на всякий случай)
+*.log
+fault.log
+diag_*
+
+# Служебное
+.vscode/
+.idea/
+Thumbs.db
