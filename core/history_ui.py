@@ -69,21 +69,27 @@ class HistoryWindow:
         sb.pack(side="right", fill="y")
         self.list.configure(yscrollcommand=sb.set)
         self.list.bind("<<ListboxSelect>>", self._on_select)
-        self.list.bind("<Double-Button-1>", lambda e: self.paste_selected())
+        # Вставка — Enter (или перетащить пункт мышью в целевое приложение).
+        # Двойной клик намеренно ничего не делает: цель вставки выбирает сам
+        # пользователь, перетаскивая текст в нужное место.
         self.list.bind("<Return>", lambda e: self.paste_selected())
         self.list.bind("<Escape>", lambda e: self.close())
         self.list.bind("<Down>", lambda e: self.move(1))
         self.list.bind("<Up>", lambda e: self.move(-1))
         self.list.bind("<Control-p>", lambda e: self.pin_selected())
         self.list.bind("<Delete>", lambda e: self.delete_selected())
+        # Drag & drop: тянем текст из списка в другое приложение
+        self.list.bind("<ButtonPress-1>", self._drag_press)
+        self.list.bind("<B1-Motion>", self._drag_motion)
+        self._drag_from = None
 
         self.preview = tk.Label(w, anchor="w", justify="left", wraplength=650,
                                 bg=COLORS["bg"], fg=COLORS["muted"], font=FONT_SMALL,
                                 text="", compound="left")
         self.preview.pack(fill="x", pady=(8, 2))
 
-        foot = ("Enter / double-click — paste      Ctrl+P — pin      "
-                "Delete — delete      Esc — close")
+        foot = ("Enter — paste      drag a row into an app — paste there      "
+                "Ctrl+P — pin      Delete — delete      Esc — close")
         tk.Label(w, text=foot, bg=COLORS["bg"], fg=COLORS["muted"],
                  font=FONT_SMALL, anchor="w").pack(fill="x")
 
@@ -195,6 +201,34 @@ class HistoryWindow:
         it = self.items[self.sel]
         self.close()
         self.app.request_paste(it, self.target_hwnd)
+
+    # --- drag & drop -----------------------------------------------------------
+
+    def _drag_press(self, e):
+        self._drag_from = (e.x, e.y, self.list.nearest(e.y))
+
+    def _drag_motion(self, e):
+        """Start an OLE drag once the cursor moves far enough while pressed."""
+        st = getattr(self, "_drag_from", None)
+        if not st:
+            return
+        x0, y0, idx = st
+        if abs(e.x - x0) < 8 and abs(e.y - y0) < 8:
+            return
+        self._drag_from = None  # so we don't fire twice
+        if not (0 <= idx < len(self.items)):
+            return
+        it = self.items[idx]
+        if not it.text:
+            return  # images/files are dragged only as text in a future version
+        try:
+            from . import dragdrop
+            effect = dragdrop.drag_text(it.text)
+        except Exception:
+            return
+        if effect:  # the text was dropped into the target app
+            self.app.history.bump(it.id)
+            self.close()
 
     def pin_selected(self):
         if not self.items:
