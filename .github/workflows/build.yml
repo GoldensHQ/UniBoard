@@ -1,0 +1,81 @@
+name: Build & Release
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller
+
+      - name: Run tests
+        run: |
+          python selftest.py
+          python selftest_clip.py
+          python selftest_drag.py
+
+      - name: Build UniBoard.exe
+        run: pyinstaller --noconfirm UniBoard.spec
+
+      - name: Determine version
+        id: ver
+        shell: pwsh
+        run: |
+          if ($env:GITHUB_REF -like "refs/tags/v*") {
+            $v = $env:GITHUB_REF -replace "refs/tags/v", ""
+          } else {
+            $v = "0.9.0-dev"
+          }
+          "version=$v" >> $env:GITHUB_OUTPUT
+          Write-Host "Version: $v"
+
+      - name: Build installer
+        shell: pwsh
+        run: |
+          choco install innosetup -y --no-progress
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          & $iscc "/DAppVersion=${{ steps.ver.outputs.version }}" uniboard.iss
+
+      - name: Pack portable zip
+        shell: pwsh
+        run: |
+          Compress-Archive -Path dist\UniBoard.exe `
+            -DestinationPath "dist\UniBoard-${{ steps.ver.outputs.version }}-portable.zip" -Force
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: UniBoard-${{ steps.ver.outputs.version }}
+          path: |
+            dist/UniBoard-Setup-*.exe
+            dist/UniBoard-*-portable.zip
+          if-no-files-found: error
+
+      - name: Publish GitHub release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          generate_release_notes: true
+          files: |
+            dist/UniBoard-Setup-*.exe
+            dist/UniBoard-*-portable.zip

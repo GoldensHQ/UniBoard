@@ -6,7 +6,7 @@ Run from the project root:  py -3 assets/make_icons.py
 """
 from pathlib import Path
 
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 
 ASSETS = Path(__file__).resolve().parent
 
@@ -87,13 +87,50 @@ def draw_logo(size=512):
     return img
 
 
+def draw_social():
+    """GitHub social preview 1280x640: logo tile + wordmark + tagline."""
+    W, H = 1280, 640
+    img = diag_gradient((W, H), (24, 28, 38), (10, 13, 19)).convert("RGBA")
+    d = ImageDraw.Draw(img)
+    # soft accent glow behind the tile (drawn blurred, so the edge stays smooth)
+    glow = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    ImageDraw.Draw(glow).ellipse([-60, 80, 420, 560], fill=(79, 140, 255, 150))
+    from PIL import ImageFilter
+    glow = glow.filter(ImageFilter.GaussianBlur(90))
+    img.alpha_composite(glow)
+    d = ImageDraw.Draw(img)
+    logo = draw_logo(512).resize((360, 360), Image.LANCZOS)
+    img.alpha_composite(logo, (70, 140))
+
+    def font(name, size):
+        try:
+            return ImageFont.truetype(str(Path(r"C:\Windows\Fonts") / name), size)
+        except Exception:
+            return ImageFont.load_default(size=size)
+
+    f_title = font("seguisb.ttf", 104)
+    f_sub = font("segoeui.ttf", 40)
+    f_small = font("segoeui.ttf", 28)
+
+    d.text((500, 205), "UniBoard", font=f_title, fill=(244, 246, 250, 255))
+    d.text((504, 330), "Smart clipboard for Windows", font=f_sub,
+           fill=(160, 176, 200, 255))
+    d.text((504, 400), "Suggestions while typing  ·  Clipboard history  ·  Snippets",
+           font=f_small, fill=(120, 132, 152, 255))
+    d.text((504, 470), "No low-level hooks — your input can never freeze",
+           font=f_small, fill=(110, 150, 255, 255))
+    return img
+
+
 def main():
     img = draw_logo(512)
     img.resize((256, 256), Image.LANCZOS).save(ASSETS / "icon.png")
     img.save(ASSETS / "uniboard.ico",
              sizes=[(16, 16), (24, 24), (32, 32), (48, 48),
                     (64, 64), (128, 128), (256, 256)])
-    print("OK:", ASSETS / "icon.png", "and", ASSETS / "uniboard.ico")
+    draw_social().convert("RGB").save(ASSETS / "social-preview.png")
+    print("OK:", ASSETS / "icon.png", ASSETS / "uniboard.ico",
+          "and", ASSETS / "social-preview.png")
 
 
 if __name__ == "__main__":

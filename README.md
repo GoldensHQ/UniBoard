@@ -1,5 +1,9 @@
 # UniBoard — smart clipboard for Windows
 
+[![Build & Release](https://github.com/GoldensHQ/UniBoard/actions/workflows/build.yml/badge.svg)](https://github.com/GoldensHQ/UniBoard/actions/workflows/build.yml)
+[![Release](https://img.shields.io/github/v/release/GoldensHQ/UniBoard?include_prereleases&label=release)](https://github.com/GoldensHQ/UniBoard/releases)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
 UniBoard is a customizable clipboard manager that lives in the tray and helps
 you paste what you copied faster: while you type, it shows a suggestion, and
 `Ctrl+Space` inserts it for you.
@@ -50,6 +54,26 @@ The result is `dist\UniBoard.exe` (the committed `UniBoard.spec` has the same
 settings: `py -3 -m PyInstaller UniBoard.spec`). For debugging, run with a
 console: `py -3 uniboard.py` (the log is also printed to the screen; the full
 log is always in `%APPDATA%\UniBoard\uniboard.log`).
+
+**Installer from source.** With [Inno Setup 6](https://jrsoftware.org/isinfo.php):
+
+```bat
+ISCC.exe uniboard.iss
+```
+
+## CI / releases
+
+GitHub Actions (`.github/workflows/build.yml`) builds and tests every push to
+`main` and publishes releases automatically:
+
+- push a tag like `v1.0.0` → a GitHub release is created with the installer and
+  the portable zip attached (tags containing `-`, e.g. `v1.1.0-beta`, are
+  marked as pre-releases):
+  ```bat
+  git tag -a v1.0.0 -m "UniBoard 1.0.0"
+  git push origin v1.0.0
+  ```
+- every build also uploads the artifacts to the workflow run page.
 
 ## How to use
 

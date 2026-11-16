@@ -2,14 +2,16 @@
 ; Build: ISCC.exe uniboard.iss  (expects dist\UniBoard.exe to exist)
 
 #define AppName "UniBoard"
-#define AppVersion "0.9.0"
+#ifndef AppVersion
+  #define AppVersion "0.9.0"
+#endif
 #define AppExe "UniBoard.exe"
 
 [Setup]
 AppId={{8F2A6C51-7E34-4B8D-9A55-2C1D10D34E11}}
 AppName={#AppName}
 AppVersion={#AppVersion}
-AppVerName={#AppName} {#AppVersion} (pre-release)
+AppVerName={#AppName} {#AppVersion}
 AppPublisher=GoldensHQ
 AppPublisherURL=https://github.com/GoldensHQ/UniBoard
 AppSupportURL=https://github.com/GoldensHQ/UniBoard/issues
@@ -17,7 +19,7 @@ DefaultDirName={localappdata}\Programs\UniBoard
 DefaultGroupName={#AppName}
 UninstallDisplayIcon={app}\{#AppExe}
 OutputDir=dist
-OutputBaseFilename=UniBoard-Setup-{#AppVersion}-pre
+OutputBaseFilename=UniBoard-Setup-{#AppVersion}
 SetupIconFile=assets\uniboard.ico
 Compression=lzma2
 SolidCompression=yes
